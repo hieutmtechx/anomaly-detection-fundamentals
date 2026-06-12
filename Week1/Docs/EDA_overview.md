@@ -33,7 +33,7 @@ Rolling variance cũng tương tự nhưng thay vì tính trung bình thì tính
 
 Một chuỗi thời gian stationarity thì biểu đồ sẽ nằm ngang ổn định và có mức độ biến động không đổi theo thời gian.
 
-5. Seasonality và cyclic
+5. Seasonality và cyclic:
 
 Seasonality xảy ra khi dữ liệu xuất hiện những dao động lặp lại do ảnh hưởng của các yếu tố thời gian, chẳng hạn như thời điểm trong năm, ngày trong tuần hoặc giờ trong ngày. Đặc điểm quan trọng của seasonality là luôn lặp lại một chu kỳ cố định và biết trước.
 
@@ -69,14 +69,14 @@ PACF đo lường mối quan hệ trực tiếp giữa giá trị hiện tại v
 
 ACF và PACF được dùng để xác định thông số p cho phần AR và q cho phần MA sau khi dữ liệu đã được diff ở phần I. 
 
-9. Cross-metric correlation heatmap
+9. Cross-metric correlation heatmap:
 
 Đây là công cụ trực quan giúp đánh giá mối quan hệ giữa nhiều metric hoặc nhiều chuỗi thời gian cùng một lúc. 
 
 - Correlation: Khi A tăng và B tăng thì giá trị = +1, khi giá trị = 0 thì A và B không liên quan, còn nếu A tăng và B giảm thì giá trị = -1.
 - Heatmap: Khi đỏ đậm thì sẽ là tương quan cao, xanh đậm là tương quan âm và còn trắng thì gần 0.
 
-10. Anomaly label distribution
+10. Anomaly label distribution:
 
 - Count: có bao nhiêu anomaly.
 - Density: mật độ anomaly, được tính bằng số nhãn anomaly trên tổng số điểm quan sát được.
