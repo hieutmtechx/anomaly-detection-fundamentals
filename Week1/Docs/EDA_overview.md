@@ -4,6 +4,16 @@ Missing value được định nghĩa là giá trị bị thiếu trong dữ li�
 
 Data gaps là khoảng thời gian không có dữ liệu.
 
+Các hướng giải quyết data gaps:
+
+- Resample method: Mục đích chính là phát hiện và lấp đầy các khoảng trống trong dữ liệu. Nó sẽ phát hiện các khoảng trống và điền vào các giá trị NA. Bước tiếp theo là lấp đầy các giá trị NA này bằng các phương pháp sau
+
++ Forward fill resample: Cơ chế hoạt động là sử dụng giá trị trước nó để fill missing values
+
++ Backward fill resample: Là sử dụng giá trị tiếp theo để fill missing values 
+
++ Interpolate fill resample: Là phương pháp vẽ một đường thẳng hoặc đường cong mượt mà nối giữa 2 điểm dữ liệu thật đã biết, từ đó tính toán và điền một cách khoa học các giá trị hợp lý vào những ngày bị thiếu ở giữa.    
+
 Sampling consistency là xem dữ liệu được ghi nhận như thế nào. Ví dụ là được ghi nhận 1p một hay là 5p một.
 
 2. Stationarity:
