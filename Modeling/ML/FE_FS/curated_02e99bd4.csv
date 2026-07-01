@@ -1,0 +1,20 @@
+feature,MI,giu,ghi_chu
+rstd_60,0.2294323852539677,True,
+rmax_60,0.20359567623770358,True,
+rstd_15,0.18364906973962913,True,
+rmax_15,0.1384416977586691,True,
+rstd_5,0.10578497873862647,True,
+rmax_5,0.09964981261304895,True,
+dev_15,0.08676468992891362,True,
+rmean_15,0.080800149276536,True,
+dev_60,0.07329977449859792,True,
+rmin_60,0.07182579484677909,True,
+dev_5,0.07138526021347502,True,
+deseason_resid,0.06931292655439836,True,giu vi dien giai/ngu canh
+pct_1,0.06012367827888254,True,giu vi dien giai/ngu canh
+diff_1,0.05659294166118389,True,
+lag_60,0.04365562090303032,True,
+dow_sin,0.029064267623215123,True,giu vi dien giai/ngu canh
+dow_cos,0.02157054198736419,True,giu vi dien giai/ngu canh
+tod_sin,0.009338866207055041,True,giu vi dien giai/ngu canh
+tod_cos,0.006937526362969626,True,giu vi dien giai/ngu canh
