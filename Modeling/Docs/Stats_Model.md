@@ -185,6 +185,31 @@ Trong đó:
 
 - `d`: xác định bằng kiểm định **ADF (Augmented Dickey-Fuller)** — nếu chuỗi gốc không dừng (p-value > 0.05), lấy sai phân và kiểm định lại đến khi dừng. Thường d=1 là đủ cho metrics hệ thống.
 - `p, q`: xác định qua biểu đồ **ACF (Autocorrelation Function)** và **PACF (Partial Autocorrelation Function)**, hoặc đơn giản hơn — dùng `auto_arima` (thư viện `pmdarima`) để grid-search tự động theo tiêu chí AIC/BIC.
+
+AIC = Akaike Information Criterion — một điểm số để so sánh các model với nhau, cân bằng giữa "khớp dữ liệu tốt" và "đừng quá phức tạp".
+
+Công thức và ý nghĩa
+
+AIC = 2k − 2·ln(L)
+- L = likelihood (độ khớp của model với dữ liệu) — càng khớp, −2·ln(L) càng nhỏ.
+- k = số tham số của model (số hạng AR + MA + ...) — càng nhiều tham số, 2k càng lớn (phạt).
+
+→ AIC thưởng cho model khớp tốt, nhưng phạt model dùng nhiều tham số. Càng thấp càng tốt. Đây chính là cách chống overfitting: một model nhồi thêm tham số sẽ khớp train tốt hơn (L tăng), nhưng nếu cải thiện không đủ bù phần phạt 2k thì AIC sẽ tăng → báo rằng thêm tham số không đáng.
+
+Điểm quan trọng: AIC chỉ có nghĩa TƯƠNG ĐỐI
+
+Con số AIC tuyệt đối (14679, 52339...) tự nó vô nghĩa — không có "AIC tốt" hay "AIC xấu". Nó chỉ dùng để so sánh các model trên cùng một bộ dữ liệu. Chỉ hiệu số ΔAIC mới mang thông tin:
+
+┌──────────────────────────────┬────────────────────────────────────┐
+│ ΔAIC (so với model tốt nhất) │              Ý nghĩa               │
+├──────────────────────────────┼────────────────────────────────────┤
+│ < 2                          │ Gần như tương đương, khó phân biệt │
+├──────────────────────────────┼────────────────────────────────────┤
+│ 2 – 10                       │ Model kia kém hơn rõ rệt           │
+├──────────────────────────────┼────────────────────────────────────┤
+│ > 10                         │ Model kia kém hơn hẳn              │
+└──────────────────────────────┴────────────────────────────────────┘
+
 - Với dữ liệu có seasonality rõ (traffic theo giờ/ngày), nên dùng **SARIMA(p,d,q)(P,D,Q,s)** — mở rộng có thêm thành phần seasonal, tránh ARIMA thường hiểu nhầm chu kỳ là trend.
 
 ### 3.4 Pseudocode Train + Predict

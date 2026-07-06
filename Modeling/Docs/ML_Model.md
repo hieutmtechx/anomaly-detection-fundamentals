@@ -62,7 +62,7 @@ Trong đó:
 | Tham số | Ý nghĩa | Khuyến nghị |
 |---|---|---|
 | `n_estimators` (T) | Số cây trong forest | 100 (mặc định) thường đủ, tăng thêm cải thiện ít |
-| `max_samples` (ψ) | Số điểm subsample để train mỗi cây | 256 (mặc định paper gốc) — **quan trọng**: không nên dùng toàn bộ dataset, subsample nhỏ giúp cây "nông" hơn, tăng độ tương phản path length giữa anomaly/normal |
+| `max_samples` (ψ) | Số điểm subsample để train mỗi cây | không nên dùng toàn bộ dataset, subsample nhỏ giúp cây "nông" hơn, tăng độ tương phản path length giữa anomaly/normal |
 | `contamination` | Tỉ lệ anomaly giả định, dùng để suy ra threshold mặc định của thư viện | Đặt = tỉ lệ anomaly thực tế ước lượng nếu biết, hoặc để `'auto'` rồi tự tune lại bằng PR Curve |
 | `max_features` | Số feature xét khi chọn split | 1.0 (toàn bộ) cho shingle vector, có thể giảm nếu vector dài để tăng đa dạng cây |
 
@@ -88,7 +88,7 @@ Pseudocode isolation_forest_fit_predict(x_series, shingle_size=10, n_estimators=
     return anomaly_scores
 ```
 
-**Lưu ý**: thư viện `sklearn.ensemble.IsolationForest` trả `decision_function` theo chiều "cao = bình thường" (ngược công thức `s(x,n)` gốc trong paper). Cần đảo dấu khi ghép chung pipeline đánh giá với các model khác để đảm bảo "score cao = nghi ngờ anomaly" thống nhất trên toàn bộ benchmark.
+**Lưu ý**: thư viện `sklearn.ensemble.IsolationForest` trả `decision_function` theo chiều "cao = bình thường". Cần đảo dấu khi ghép chung pipeline đánh giá với các model khác để đảm bảo "score cao = nghi ngờ anomaly" thống nhất trên toàn bộ benchmark.
 
 ### 1.5 Vấn đề riêng khi áp dụng cho Time Series
 
