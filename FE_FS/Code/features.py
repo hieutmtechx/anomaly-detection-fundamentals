@@ -12,8 +12,11 @@ import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
 
 
-def build_features(p, period=1440):
+def build_features(p, period=None):
     """Tạo 27 feature thô từ `value_filled`. Deterministic, không dùng nhãn.
+
+    `period` = độ dài cửa sổ trend (số hàng ~ 1 ngày). Nếu None sẽ tự suy từ
+    sampling step: 1440 cho KPI 60s, 288 cho KPI 300s. Truyền tay để override.
 
     Nhóm feature:
       - lag_{1,5,10,60}                 : giá trị quá khứ trực tiếp
@@ -28,6 +31,11 @@ def build_features(p, period=1440):
     masked = p.masked.values
     tr_rows = (p.split.values == "train")
 
+    # period (số hàng ~ 1 ngày) suy từ sampling step nếu không truyền vào
+    if period is None:
+        step = int(pd.Series(np.diff(ts)).mode().iloc[0])   # 60s hoặc 300s
+        period = 86400 // step                              # -> 1440 (60s) | 288 (300s)
+
     F = pd.DataFrame(index=p.index)
     F["value"] = x
 
@@ -38,8 +46,10 @@ def build_features(p, period=1440):
     # 2) Rolling stats + độ lệch baseline
     for w in [5, 15, 60]:
         r = x.rolling(w)
-        F[f"rmean_{w}"] = r.mean(); F[f"rstd_{w}"] = r.std()
-        F[f"rmin_{w}"]  = r.min();  F[f"rmax_{w}"] = r.max()
+        F[f"rmean_{w}"] = r.mean() 
+        F[f"rstd_{w}"] = r.std()
+        F[f"rmin_{w}"]  = r.min()
+        F[f"rmax_{w}"] = r.max()
         F[f"dev_{w}"]   = x - r.mean()
 
     # 3) Rate of change
@@ -49,7 +59,7 @@ def build_features(p, period=1440):
     #    trend = rolling median TRAILING (past-only, center=False)
     #    seasonal profile = median theo phút-trong-ngày
     xi = x.interpolate(limit_direction="both").bfill().ffill()
-    trend = xi.rolling(period, center=False, min_periods=200).median()
+    trend = xi.rolling(period, center=False, min_periods=min(200, period // 2)).median()
     mod = ((ts % 86400) // 60).astype(int)                       # phút-trong-ngày 0..1439
     prof = pd.Series((xi - trend).values[tr_rows]).groupby(mod[tr_rows]).median()
     seasonal = pd.Series(mod).map(prof)
@@ -65,24 +75,35 @@ def build_features(p, period=1440):
     return F
 
 
-def select_features(F, p, cv_thr=0.01, corr_thr=0.95, mi_thr=1e-4):
+def select_features(F, p, corr_thr=0.95, mi_thr=1e-4, min_samples=50):
     """Lọc feature 3 bước:
 
-      B1 Variance/CV : loại feature gần hằng số (CV = std/|mean| < cv_thr).
+      B1 Degenerate  : loại cột suy biến (std == 0 hoặc toàn NaN). KHÔNG lọc theo
+                       variance/CV — feature tốt cho anomaly thường gần hằng số rồi
+                       bùng nổ hiếm, lọc phương sai sẽ loại nhầm; để B3 (MI) lo.
       B2 Correlation : với mỗi cặp |corr| > corr_thr, giữ feature có MI cao hơn.
       B3 MI ranking  : giữ feature có mutual information với nhãn > mi_thr.
+
+    MI tính riêng từng feature trên đúng các hàng train non-NaN của nó (univariate),
+    không đòi hỏi mọi feature cùng non-NaN → tận dụng tối đa dữ liệu quanh gap.
 
     Trả về: list tên feature giữ lại, xếp theo MI giảm dần.
     """
     lab = p.label.values.astype(int)
     tr = (p.split.values == "train")
 
-    # B1 — variance / hệ số biến thiên
-    cv = (F[tr].std() / (F[tr].mean().abs() + 1e-9)).abs()
-    keep = [c for c in F.columns if cv[c] >= cv_thr]
+    # B1 — chỉ loại cột hằng số / toàn NaN (std NaN -> "> 0" là False -> loại)
+    std_tr = F[tr].std()
+    keep = [c for c in F.columns if std_tr[c] > 0]
 
-    mtr = tr & F[keep].notna().all(axis=1).values
-    mi = pd.Series(mutual_info_classif(F.loc[mtr, keep], lab[mtr], random_state=0), index=keep)
+    # MI per-feature: mỗi feature dùng riêng các hàng train non-NaN của nó
+    mi = {}
+    for c in keep:
+        m = tr & F[c].notna().values
+        mi[c] = (mutual_info_classif(F.loc[m, [c]], lab[m],
+                                     discrete_features=False, random_state=0)[0]
+                 if m.sum() >= min_samples and lab[m].sum() > 0 else 0.0)
+    mi = pd.Series(mi)
 
     # B2 — bỏ feature dư thừa theo cặp tương quan cao, giữ cái MI lớn hơn
     corr = F.loc[tr, keep].corr().abs()
