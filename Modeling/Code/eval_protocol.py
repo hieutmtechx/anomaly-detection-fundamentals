@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score, precision_recall_curve
+from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
+
+
 
 
 def time_split_per_kpi(df, train_frac=0.6, val_frac=0.2, kpi_col="kpi", time_col="timestamp"):
@@ -28,7 +30,8 @@ def prf(y_true, y_pred, beta=1.0):
 
 
 def _segments(y_true):
-    y = np.asarray(y_true); idx = np.where(y == 1)[0]
+    y = np.asarray(y_true)
+    idx = np.where(y == 1)[0]
     if len(idx) == 0:
         return []
     brk = np.where(np.diff(idx) > 1)[0]
@@ -56,7 +59,7 @@ def time_to_detect(y_true, y_pred, step_s=60):
 
 
 def best_f1_prcurve(y_true, scores, beta=1.0):
-    """Quét MỌI threshold qua precision_recall_curve (không xấp xỉ grid).
+    """Quét threshold qua precision_recall_curve.
     Chỉ dùng cho point-wise: point-adjust làm prediction không đơn điệu theo threshold."""
     p, r, th = precision_recall_curve(y_true, scores)
     b2 = beta * beta
@@ -83,22 +86,38 @@ def best_f1_threshold(y_true, scores, adjust=False, beta=1.0, n_grid=150):
     return best
 
 
-def evaluate_protocol(y_val, s_val, y_test, s_test, beta=1.0, step_s=60):
-    """Gọi RIÊNG cho từng KPI rồi mới gộp — segment không được bắc qua ranh giới KPI."""
-    out = {}
-    for mode, adj in [("PW", False), ("PA", True)]:
-        # PW: best-F1 chính xác qua PR curve sklearn; PA: grid sweep + point-adjust
-        bt = best_f1_threshold(y_val, s_val, adjust=True, beta=beta) if adj \
-            else best_f1_prcurve(y_val, s_val, beta=beta)
-        thr = bt["threshold"]
-        yp = (np.asarray(s_test) >= thr).astype(int)
-        if adj:
-            yp = point_adjust(y_test, yp)
-        m = prf(y_test, yp, beta); m["threshold"] = thr; m["val_fbeta"] = bt["fbeta"]
-        out[mode] = m
-    out["AP_pw"] = float(average_precision_score(y_test, s_test))
-    out["TTD"] = time_to_detect(y_test, (np.asarray(s_test) >= out["PW"]["threshold"]).astype(int), step_s)
-    return out
+def evaluate_protocol(y_val, s_val, y_test, s_test, beta=1.0, step_s=60,
+                      y_test_full=None, valid_test=None):
+    """PW-only. Ngưỡng max-F1 chọn trên VAL, mọi chỉ số báo cáo trên TEST.
+
+    y_test / s_test : chỉ các điểm model chấm được  -> dùng cho AP.
+    y_test_full     : nhãn test đầy đủ trên lưới đều -> để P/R/F1 và TTD tính
+                      trên toàn bộ test; điểm không chấm được coi là pred 0
+                      (không phát hiện), và _segments đếm đúng số sự cố.
+    valid_test      : mask cho biết điểm nào trong lưới đầy đủ được chấm.
+    """
+    thr = best_f1_prcurve(y_val, s_val, beta=beta)["threshold"]   # CHỌN ngưỡng trên VAL
+    s_test = np.asarray(s_test)
+    yp = (s_test >= thr).astype(int)
+
+    if y_test_full is not None and valid_test is not None:
+        valid_test = np.asarray(valid_test)
+        y_eval = np.asarray(y_test_full)
+        pred = np.zeros(len(y_eval), dtype=int)
+        pred[valid_test] = yp                     # điểm bỏ sót do coverage -> FN
+    else:
+        y_eval, pred = np.asarray(y_test), yp
+
+    m = prf(y_eval, pred, beta)                   # Precision / Recall / F1 point-wise
+    m["threshold"] = thr
+
+    return dict(
+        PW=m,                                                     # P, R, F1 (test)
+        AP_pw=float(average_precision_score(y_test, s_test)),     # PR-AUC test (BÁO CÁO)
+        AP_val=float(average_precision_score(y_val, s_val)),      # PR-AUC val (CHỌN model)
+        ROC=float(roc_auc_score(y_test, s_test)),                 # ROC-AUC test (phụ)
+        TTD=time_to_detect(y_eval, pred, step_s),                 # độ trễ phát hiện
+    )
 
 
 def plot_pr_curve(curves, title=None, mark_best_f1=True, per_kpi=False, ax=None):
