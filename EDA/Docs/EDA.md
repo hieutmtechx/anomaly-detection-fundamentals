@@ -1,33 +1,23 @@
-## 0. Bối cảnh
-
-Dataset có dạng: `timestamp, value, label, KPI_id`, mỗi KPI là một time series univariate riêng, sampling đều (1 hoặc 5 phút/điểm), có nhãn point-level (0/1) cho anomaly. Vài điểm cần để ý:
-
-- **Không impute/transform trước khi hiểu data**, vì các bước biến đổi (interpolation, smoothing, log-transform) có thể vô tình xoá hoặc làm méo chính các anomaly mình đang muốn tìm. EDA ở giai đoạn này nên ưu tiên quan sát, transform chỉ áp dụng tạm thời cho mục đích thống kê chứ không ghi đè lên data gốc.
-- **Mỗi KPI một tính cách riêng**: target rate, seasonality, scale rất khác nhau giữa các KPI. Vì vậy EDA cần làm theo từng KPI rồi mới tổng hợp, không gộp chung ngay từ đầu.
-- **Train/test split phải tôn trọng thời gian**: nếu dataset đã chia sẵn train/test  EDA cũng nên làm riêng trên từng phần để tránh nhìn thấy pattern test mà chưa nên biết.
-
----
-
 ## 1. Missing values, data gaps, sampling consistency
 
 ### 1.1 Phân biệt 2 loại thiếu dữ liệu
-Đây là điểm hay bị nhầm: KPI monitoring có hai dạng thiếu khác hẳn nhau, cần xử lý khác nhau.
+Có hai dạng thiếu khác hẳn nhau, cần xử lý khác nhau.
 
 - **Missing value (NaN) trong record có sẵn**: timestamp tồn tại nhưng `value` là null. Thường do lỗi ghi nhận, lỗi parser.
-- **Gap trong timeline**: timestamp bị nhảy cóc — ví dụ sampling 1 phút nhưng có đoạn nhảy từ `10:05` sang `10:20`. Đây là dấu hiệu downtime của hệ thống thu thập (agent chết, network drop) — bản thân gap có thể chính là một dạng anomaly (collecting failure), không nên âm thầm lấp đầy.
-
-Quy trình kiểm tra:
-1. Build `expected_index` theo tần suất sampling chuẩn (`pd.date_range(start, end, freq=...)`), so với `actual_index` để liệt kê toàn bộ gap (vị trí, độ dài).
-2. Tính tỉ lệ % gap trên tổng timeline, phân bố độ dài gap (gap 1 điểm vs gap kéo dài hàng giờ → nguyên nhân khác nhau).
-3. Check overlap giữa gap và vùng có label anomaly = 1 nếu data hỗ trợ — gap ngay trước/sau anomaly có thể gợi ý nguyên nhân hệ thống.
+- **Gap trong timeline**: timestamp bị nhảy cóc — ví dụ sampling 1 phút nhưng có đoạn nhảy từ `10:05` sang `10:20`. Đây là dấu hiệu downtime của hệ thống thu thập — bản thân gap có thể chính là một dạng anomaly (collecting failure), không nên âm thầm lấp đầy.
 
 ### 1.2 Sampling consistency
-- Verify interval giữa các timestamp liên tiếp có đúng là hằng số không, vì một số KPI trong dataset thực tế có tần suất không hoàn toàn đều.
+- Verify interval giữa các timestamp liên tiếp có đúng là hằng số không, vì trong dataset thực tế có tần suất không hoàn toàn đều.
 - Check trùng timestamp (duplicate index) — cần quyết định giữ bản nào hoặc aggregate.
-- Nếu nhiều KPI trong cùng dataset có tần suất khác nhau, cần resample về cùng grid trước khi làm cross-metric analysis.
+- Nếu trong dataset có nhiều tần suất khác nhau, cần resample về cùng grid trước khi làm cross-metric analysis.
 
-### 1.3 Quyết định xử lý (chỉ áp dụng cho bản sao phục vụ thống kê, giữ bản gốc nguyên vẹn)
+### 1.3 Quyết định xử lý
+
 Tài liệu chung về xử lý missing trong time series khuyên nên cân nhắc theo độ dài gap: gap ngắn (1-2 điểm) dùng linear interpolation hoặc rolling-statistic imputation là hợp lý; gap dài cần phương pháp tôn trọng seasonality (ví dụ seasonal-aware imputation) hoặc đơn giản là loại bỏ đoạn đó khỏi phân tích thống kê thay vì cố lấp. Method đơn giản (mean/forward-fill) rủi ro làm giảm variance giả tạo, ảnh hưởng tới ADF test và STL ở bước sau.
+
+Linear interpolation: là cách lấp giá trị thiếu bằng cách nối thẳng đường giữa điểm biết trước và điểm biết sau, rồi lấy giá trị trên đường thẳng đó tại vị trí cần điền; Nếu biết value tại thời điểm t0 là v0, và tại t1 là v1, thì giá trị tại thời điểm t nằm giữa (t0 < t < t1) được tính bằng v(t) = v0 + (v1 - v0) * (t - t0) / (t1 - t0)
+
+Seasonal-aware imputation: là cách lấp giá trị sao cho vẫn giữ được hình dạng chu kỳ thay vì một đường thẳng như linear interpolation/forward-fill. Có nghĩa là vào đúng thời điểm trong chu kỳ này, series thường có giá trị là bao nhiêu.
 
 **Output cần có**: bảng tổng hợp theo từng KPI — số điểm, % NaN, số gap, gap dài nhất, sampling interval mode.
 
@@ -36,9 +26,10 @@ Tài liệu chung về xử lý missing trong time series khuyên nên cân nh�
 ## 2. Stationarity: ADF test + rolling mean/variance
 
 ### 2.1 Vì sao quan tâm stationarity
+
 Phần lớn pipeline thống kê cổ điển (ARIMA, một số baseline forecast-based anomaly detector) giả định series stationary. Ngay cả khi dùng deep learning, biết series có stationary hay không vẫn giúp chọn đúng cách feature engineering (cần differencing hay không, window size cho rolling feature).
 
-### 2.2 ADF test
+### 2.2 ADF test và KPSS test
 - Null hypothesis: series có unit root (non-stationary). p-value < 0.05 → bác bỏ null → series stationary.
 - **Pitfall quan trọng**: p-value > 0.05 không tự động nghĩa là "non-stationary chắc chắn" — đó chỉ là "không đủ bằng chứng bác bỏ null". Nên kết hợp thêm **KPSS test** vì KPSS đảo ngược null hypothesis (null: series stationary). Bốn kịch bản kết hợp ADF + KPSS:
   - ADF bác bỏ null + KPSS không bác bỏ → series stationary (đồng thuận).
@@ -87,7 +78,7 @@ Phần lớn pipeline thống kê cổ điển (ARIMA, một số baseline forec
 
 ### 5.1 Thống kê cơ bản (per KPI và toàn dataset)
 - Count: tổng số điểm label = 1 vs 0.
-- Density: tỉ lệ % anomaly trên tổng — đây là con số quyết định chiến lược: AIOps KPI dataset thực tế thường có anomaly rate rất thấp (dưới 1-5%), nghĩa là bài toán cực kỳ imbalanced, ảnh hưởng trực tiếp đến chọn metric (không nên dùng accuracy, nên dùng F1/precision-recall, hoặc best-F1-with-point-adjustment như cách AIOps Challenge gốc đánh giá).
+- Density: tỉ lệ % anomaly trên tổng — đây là con số quyết định chiến lược: dataset thực tế thường có anomaly rate rất thấp (dưới 1-5%), nghĩa là bài toán cực kỳ imbalanced, ảnh hưởng trực tiếp đến chọn metric (không nên dùng accuracy, nên dùng F1/precision-recall, hoặc best-F1-with-point-adjustment).
 - Phân bố density theo từng KPI riêng — vì rate có thể chênh lệch rất lớn giữa các KPI (có KPI gần như không có anomaly, có KPI nhiều).
 
 ### 5.2 Point vs Collective
@@ -96,35 +87,20 @@ Phân loại từng vùng anomaly liên tiếp (segment) theo độ dài:
 - **Contextual outlier**: giá trị nằm trong range bình thường của toàn series nhưng bất thường so với context cục bộ (ví dụ window xung quanh).
 - **Collective/subsequence anomaly**: chuỗi nhiều điểm liên tiếp cùng được gắn nhãn, từng điểm riêng lẻ có thể không bất thường nhưng cả đoạn tạo thành pattern lạ.
 
-Cách đo: group các label=1 liên tiếp thành segment (`(label != label.shift()).cumsum()` rồi filter label=1), tính độ dài mỗi segment → vẽ histogram độ dài. Nếu phần lớn segment dài = 1 → point-dominant dataset, phù hợp baseline đơn giản (z-score, IQR). Nếu nhiều segment dài → cần detector nhận diện pattern/shape (ví dụ dựa trên reconstruction error của window, không chỉ per-point threshold).
+Cách đo: group các label=1 liên tiếp thành segment (`(label != label.shift()).cumsum()` rồi filter label=1), tính độ dài mỗi segment → vẽ histogram độ dài. Nếu phần lớn segment dài = 1 → point-dominant dataset, phù hợp baseline đơn giản (z-score, IQR). Nếu nhiều segment dài → cần detector nhận diện pattern/shape.
 
 ### 5.3 Vị trí anomaly tương quan với các thành phần đã phân tích
-- Overlay nhãn anomaly lên: rolling mean/std plot (mục 2.3), STL residual (mục 3.1) — xem các anomaly đã biết rơi vào residual lớn hay bị decomposition "nuốt" mất (đã cảnh báo ở 3.1).
+- Overlay nhãn anomaly lên: rolling mean/std plot, STL residual — xem các anomaly đã biết rơi vào residual lớn hay bị decomposition "nuốt" mất.
 - Đây là bước kiểm tra chéo quan trọng: nếu phần lớn anomaly thật KHÔNG hiện rõ ở residual STL, nghĩa là pipeline residual-based sẽ miss nhiều case → cần cân nhắc thêm hướng tiếp cận khác (forecasting-based, hoặc multivariate).
 
 ---
 
 ## 6. Cross-metric correlation heatmap
 
-- Resample toàn bộ KPI về cùng time grid (bước 1.2) trước khi tính correlation, nếu không sẽ bị lệch alignment.
+- Resample toàn bộ KPI về cùng time grid trước khi tính correlation, nếu không sẽ bị lệch alignment.
 - Tính Pearson correlation matrix giữa các KPI ở mức giá trị gốc, **và** ở mức "anomaly indicator" (binary label) để xem liệu nhiều KPI có thường xuyên bất thường cùng lúc không (co-occurrence của anomaly, gợi ý root cause chung hoặc dependency giữa services).
 - Pearson chỉ bắt linear relationship — nên bổ sung thêm Spearman (rank correlation) cho các cặp có khả năng phi tuyến, vì nhiều cặp metric vận hành (vd CPU vs latency) không nhất thiết tuyến tính.
 - Với data nhiều KPI (vài chục), nên cluster heatmap (hierarchical clustering trên ma trận correlation) thay vì nhìn ma trận thô, để nhóm các KPI có hành vi tương tự — hữu ích sau này nếu định làm multivariate anomaly detection theo nhóm thay vì univariate riêng lẻ từng KPI.
 - Lưu ý: correlation tính trên toàn bộ chuỗi có thể bị che lấp nếu quan hệ giữa hai metric chỉ xuất hiện trong giai đoạn anomaly (correlation tăng đột biến lúc incident) — có thể bổ sung rolling correlation theo thời gian để bắt hiện tượng này, hữu ích cho hướng root-cause-analysis sau này.
-
----
-
-## 7. Checklist tổng hợp khi chạy thật
-
-| Bước | Output cần lưu lại |
-|---|---|
-| Missing/gaps | Bảng % NaN, số gap, gap dài nhất theo từng KPI |
-| Stationarity | Bảng ADF + KPSS statistic/p-value, kết luận stationary/non theo từng KPI |
-| Seasonality | Period được FFT gợi ý, 3 plot STL (trend/seasonal/residual) cho từng KPI mẫu |
-| ACF/PACF | Plot cho ≥5 KPI đại diện, ghi chú lag đáng chú ý |
-| Anomaly distribution | Density per KPI, histogram độ dài segment (point vs collective) |
-| Correlation | Heatmap giá trị gốc + heatmap anomaly co-occurrence |
-
-Khi có data thật, giữ nguyên khung này — chỉ thay input. Nếu data thật có thêm metadata khác (service name, host, region), nên thêm bước EDA phân nhóm theo metadata trước khi gộp toàn bộ.
 
 ---

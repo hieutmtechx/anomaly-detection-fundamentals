@@ -92,7 +92,7 @@ Mở rộng khái niệm Precision/Recall sang các range thay vì điểm rời
 
 Hầu hết các model trong phạm vi này (Z-score, STL residual, ARIMA residual, Isolation Forest, RCF) đều xuất ra một **anomaly score liên tục**, sau đó áp threshold để ra nhãn nhị phân. PR Curve cho thấy toàn bộ trade-off Precision/Recall khi threshold thay đổi, không cố định ở một điểm.
 
-ROC Curve (TPR vs FPR) bị "lạc quan giả" khi class imbalance cao (anomaly hiếm) vì FPR = FP/(FP+TN) — mẫu số TN rất lớn nên FPR luôn trông nhỏ, làm ROC curve trông đẹp dù Precision thực tế tệ. PR Curve nhạy hơn nhiều với imbalance vì Precision có FP ở tử số trực tiếp so với TP, không bị pha loãng bởi TN khổng lồ.
+ROC Curve (TPR vs FPR) bị "lạc quan giả" khi class imbalance cao (anomaly hiếm) vì FPR = FP/(FP+TN) — mẫu số TN rất lớn nên FPR luôn trông nhỏ, làm ROC curve trông đẹp dù Precision thực tế tệ. PR Curve nhạy hơn nhiều với imbalance vì Precision có FP ở trực tiếp so với TP, không bị pha loãng bởi TN khổng lồ.
 
 → **Trong anomaly detection (luôn imbalance), PR Curve là lựa chọn chuẩn, ROC chỉ nên dùng bổ sung.**
 
