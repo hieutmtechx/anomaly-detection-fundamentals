@@ -4,6 +4,8 @@ phân biệt được ở 8 ký tự). Full hash chỉ dùng khi đọc file g�
 """
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -14,6 +16,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TRAIN_CSV = ROOT / "Data" / "train.csv"
 TEST_CSV = ROOT / "Data" / "test.csv"
+
+sys.path.insert(0, str(ROOT / "Modeling" / "Code"))
+from preprocess import mask_long_gaps, reindex_regular_grid   # noqa: E402
 
 # 16 KPI có lưới thời gian 60s khớp nhau (cohort A + B, 2017), dùng làm
 # tập mặc định cho correlation heatmap. Xem memory kpi-time-cohorts.
@@ -59,6 +64,25 @@ def kpi_meta(source: str = "train") -> pd.DataFrame:
     meta = pd.DataFrame(rows)
     meta["year"] = meta["start"].dt.year
     return meta.sort_values(["step_s", "start", "k8"]).reset_index(drop=True)
+
+
+@st.cache_data(show_spinner="Đang dựng lưới thời gian đều…")
+def grid_series(k8: str, source: str = "train") -> pd.DataFrame:
+    """Đưa 1 KPI về lưới thời gian đều — y hệt bước preprocess lúc train.
+
+    Dữ liệu thô thiếu ~2% điểm và CSV không lưu dòng trống, nên cắt thẳng N dòng
+    thô sẽ được một cửa sổ trải HƠN N bước thời gian. Lúc train mọi feature được
+    tính trên lưới đều (gap ngắn ≤5 điểm nội suy, gap dài đánh dấu `masked`), nên
+    lúc serve phải cắt trên đúng lưới đó thì feature mới khớp.
+
+    Trả về DataFrame có: timestamp, value_filled (NaN ở gap dài), masked, label, dt.
+    """
+    df = load_data(source)
+    g = df[df["k8"] == k8][["timestamp", "value", "label", "kpi"]].sort_values("timestamp")
+    g = reindex_regular_grid(g, kpi_col="kpi")
+    g = mask_long_gaps(g, max_gap_points=5)
+    g["dt"] = pd.to_datetime(g["timestamp"], unit="s")
+    return g.reset_index(drop=True)
 
 
 def kpi_label(row: pd.Series) -> str:
