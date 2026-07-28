@@ -12,11 +12,18 @@ import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
 
 
-def build_features(p, period=None):
+def build_features(p, period=None, season_prof=None):
     """Tạo 27 feature thô từ `value_filled`. Deterministic, không dùng nhãn.
 
     `period` = độ dài cửa sổ trend (số hàng ~ 1 ngày). Nếu None sẽ tự suy từ
     sampling step: 1440 cho KPI 60s, 288 cho KPI 300s. Truyền tay để override.
+
+    `season_prof` = profile mùa vụ (Series, index = phút-trong-ngày).
+    None (mặc định) = tự tính từ `p` — đúng cho lúc train, khi `p` là cả chuỗi
+    dài nên mỗi mốc phút có hàng chục mẫu để lấy trung vị. Lúc SERVE phải truyền
+    profile đã đóng băng vào: một cửa sổ ~1 ngày chỉ có 1 mẫu / mốc phút, trung
+    vị của 1 số chính là nó, khiến `deseason_resid` sụp về 0. Profile tính được
+    lấy ra qua `build_features(p).attrs["season_prof"]`.
 
     Nhóm feature:
       - lag_{1,5,10,60}                 : giá trị quá khứ trực tiếp
@@ -61,8 +68,9 @@ def build_features(p, period=None):
     xi = x.interpolate(limit_direction="both").bfill().ffill()
     trend = xi.rolling(period, center=False, min_periods=min(200, period // 2)).median()
     mod = ((ts % 86400) // 60).astype(int)                       # phút-trong-ngày 0..1439
-    prof = pd.Series((xi - trend).values[tr_rows]).groupby(mod[tr_rows]).median()
-    seasonal = pd.Series(mod).map(prof)
+    if season_prof is None:
+        season_prof = pd.Series((xi - trend).values[tr_rows]).groupby(mod[tr_rows]).median()
+    seasonal = pd.Series(mod).map(season_prof)
     resid = (xi.values - trend.values - seasonal.values)
     resid[masked] = np.nan                                       # gap dài -> không tin cậy
     F["deseason_resid"] = resid
@@ -72,6 +80,10 @@ def build_features(p, period=None):
     dow = ((ts // 86400) % 7) / 7.0
     F["tod_sin"] = np.sin(2*np.pi*tod); F["tod_cos"] = np.cos(2*np.pi*tod)
     F["dow_sin"] = np.sin(2*np.pi*dow); F["dow_cos"] = np.cos(2*np.pi*dow)
+
+    # metadata đính kèm (không phải feature) — build serve bundle lấy ra đóng băng
+    F.attrs["season_prof"] = season_prof
+    F.attrs["period"] = period
     return F
 
 
