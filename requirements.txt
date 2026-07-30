@@ -1,0 +1,35 @@
+# anomaly-detection-fundamentals -- direct dependencies
+# Python 3.11+ (verified on 3.11.5)
+# Install: pip install -r requirements.txt
+#
+# NOTE: comments here are ASCII on purpose. pip decodes this file with the
+# system locale codec (cp1252 on Windows), so non-ASCII text breaks install.
+
+# --- Data processing ---
+pandas==3.0.3
+numpy==2.4.6
+
+# --- Models ---
+scikit-learn==1.9.0        # IsolationForest, mutual_info_classif, PR-AUC / ROC
+statsmodels==0.14.6        # STL decomposition, ARIMA
+
+# --- Artifact storage ---
+joblib==1.5.3              # model bundles (.joblib)
+pyarrow==24.0.0            # read/write scores (.parquet)
+
+# --- API ---
+fastapi==0.139.2
+uvicorn==0.51.0
+pydantic==2.13.4
+
+# --- Dashboard ---
+streamlit==1.59.1
+plotly==6.8.0
+requests==2.34.2           # Panel 3 calls the API
+
+# --- Model explainability ---
+shap==0.51.0               # TreeExplainer for Isolation Forest
+
+# --- Notebooks ---
+jupyter==1.1.1
+matplotlib==3.10.9

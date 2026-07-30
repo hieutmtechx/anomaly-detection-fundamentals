@@ -22,6 +22,8 @@ st.markdown(
     - **1 · Data Explorer** — khám phá chuỗi thời gian, phân bố nhãn, tương quan giữa các KPI.
     - **2 · Model Lab** — thử nghiệm các mô hình. 
     - **3 · Live Prediction** — chọn KPI, gọi FastAPI /predict, hiển thị nhãn normal/anomaly, score.    
+    - **4 · Model Monitoring** — nhật ký alert và chỉ số drift.
+    - **5 · Root Cause Analysis** — phân tích nguyên nhân gốc.
     """
 )
 
