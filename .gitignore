@@ -1,8 +1,5 @@
-Data/*.csv
-!Data/.gitkeep
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 scratch_*.txt
 scratch_*.log
-Modeling/Artifacts/
