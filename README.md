@@ -19,7 +19,7 @@ Phát hiện bất thường trên chuỗi KPI hệ thống, từ EDA → featur
 
 Cho một chuỗi giá trị KPI theo thời gian (CPU, lưu lượng, tỷ lệ lỗi… đã ẩn danh), xác định mỗi điểm là **bình thường** hay **bất thường**. Đầu ra phải dùng được trong vận hành: có điểm số, có ngưỡng, có giải thích.
 
-Ba đặc thù khiến đây không phải bài toán phân loại nhị phân thông thường:
+Hai đặc thù khiến đây không phải bài toán phân loại nhị phân thông thường:
 
 **Mất cân bằng** — 2,16% điểm là anomaly, KPI ít nhất chỉ 0,02%. Tỷ lệ giữa KPI cao nhất và thấp nhất chênh 364 lần. Accuracy vô nghĩa; phải dùng PR-AUC, và tune ngưỡng riêng từng KPI.
 
